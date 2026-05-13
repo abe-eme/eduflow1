@@ -13,28 +13,31 @@ use App\Models\Submission;
 class CourseController extends Controller
 {
     // teacher creates course
-    public function store(Request $request)
-    {
-        $request->validate([
-            'title' => 'required',
-            'description' => 'nullable'
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'title' => 'required',
+        'description' => 'required',
+    ]);
 
-        Course::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'user_id' => auth()->id(),
-            'status' => 'pending'
-        ]);
+    Course::create([
+        'title' => $request->title,
+        'description' => $request->description,
 
-        return redirect('/teacher/courses');
-    }
+        // 🔥 THIS FIXES YOUR ERROR
+        'teacher_id' => auth()->id(),
+
+        'status' => 'pending',
+    ]);
+
+    return redirect('/teacher/courses');
+}
 
     // teacher courses list
     public function teacherIndex()
     {
         return Inertia::render('Teacher/Courses/Index', [
-            'courses' => Course::where('user_id', auth()->id())->latest()->get()
+            'courses' => Course::where('teacher_id', auth()->id())->latest()->get()
         ]);
     }
 

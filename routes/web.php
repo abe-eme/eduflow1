@@ -12,6 +12,8 @@ use App\Models\Submission;
 
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\LessonController;
+use App\Http\Controllers\Admin\CourseBatchController;
+use App\Http\Controllers\Student\BatchEnrollmentController;
 
 
 
@@ -39,7 +41,7 @@ require __DIR__.'/auth.php';
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth'])->group(function () {
+
 
     /*
     |--------------------------------------------------------------------------
@@ -87,13 +89,11 @@ Route::middleware(['auth'])->group(function () {
 
     })->name('admin.users.index');
 
-
     Route::get('/admin/users/create', function () {
 
         return Inertia::render('Admin/Users/Create');
 
     })->name('admin.users.create');
-
 
     Route::post('/admin/users', function (Request $request) {
 
@@ -116,7 +116,6 @@ Route::middleware(['auth'])->group(function () {
 
     })->name('admin.users.store');
 
-
     Route::post('/admin/users/{user}/toggle-status', function (User $user) {
 
         $user->status = $user->status === 'active'
@@ -129,7 +128,6 @@ Route::middleware(['auth'])->group(function () {
 
     })->name('admin.users.toggle-status');
 
-
     Route::get('/admin/users/{user}/edit', function (User $user) {
 
         return Inertia::render('Admin/Users/Edit', [
@@ -137,7 +135,6 @@ Route::middleware(['auth'])->group(function () {
         ]);
 
     })->name('admin.users.edit');
-
 
     Route::put('/admin/users/{user}', function (User $user, Request $request) {
 
@@ -168,42 +165,31 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/courses', [CourseController::class, 'adminIndex'])
         ->name('admin.courses.index');
 
+    Route::post('/admin/courses/{course}/approve', [CourseController::class, 'approve'])
+        ->name('admin.courses.approve');
+
+    Route::post('/admin/courses/{course}/reject', [CourseController::class, 'reject'])
+        ->name('admin.courses.reject');
+
+    Route::post('/admin/courses/{course}/suspend', [CourseController::class, 'suspend'])
+        ->name('admin.courses.suspend');
+
     /*
     |--------------------------------------------------------------------------
-    | APPROVE COURSE
+    | BATCHES (FIXED)
     |--------------------------------------------------------------------------
     */
 
-    Route::post('/admin/courses/{course}/approve',
-        [CourseController::class, 'approve']
-    )->name('admin.courses.approve');
+    Route::get('/admin/batches', [CourseBatchController::class, 'index']);
+    Route::post('/admin/batches', [CourseBatchController::class, 'store']);
+    Route::patch('/admin/batches/{id}/status', [CourseBatchController::class, 'updateStatus']);
+Route::get('/admin/batches/create', [CourseBatchController::class, 'create']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | REJECT COURSE
-    |--------------------------------------------------------------------------
-    */
-
-    Route::post('/admin/courses/{course}/reject',
-        [CourseController::class, 'reject']
-    )->name('admin.courses.reject');
-    /*
-    |--------------------------------------------------------------------------
-    | SUSPEND COURSE
-    |--------------------------------------------------------------------------
-    */
-
-    Route::post('/admin/courses/{course}/suspend',
-        [CourseController::class, 'suspend']
-    )->name('admin.courses.suspend');
-
-});
 /*
 |--------------------------------------------------------------------------
 | DELETE USER
 |--------------------------------------------------------------------------
 */
-
 Route::delete('/admin/users/{user}', function (User $user) {
 
     $user->delete();
@@ -211,7 +197,6 @@ Route::delete('/admin/users/{user}', function (User $user) {
     return redirect('/admin/users');
 
 })->name('admin.users.destroy');
-
 
     /*
     |--------------------------------------------------------------------------
@@ -631,5 +616,5 @@ Route::middleware(['auth'])->group(function () {
 
 });
 });
-
 });
+

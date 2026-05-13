@@ -13,18 +13,24 @@ class Submission extends Model
         'assignment_id',
         'user_id',
         'answer',
-        'file',
-        'status',
+        'score',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONSHIPS
+    |--------------------------------------------------------------------------
+    */
+
+    // Submission belongs to student
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    // Submission belongs to assignment
     public function assignment()
     {
         return $this->belongsTo(Assignment::class);
     }
-
-
-public function user()
-{
-    return $this->belongsTo(User::class, 'user_id');
-}
 }

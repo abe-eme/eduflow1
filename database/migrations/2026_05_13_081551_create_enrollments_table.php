@@ -11,8 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-    Schema::table('lessons', function (Blueprint $table) {
-    $table->string('type')->default('text');
+        Schema::create('enrollments', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->foreignId('course_id')->constrained()->onDelete('cascade');
+
+    $table->timestamp('enrolled_at')->nullable();
+    $table->timestamps();
 });
     }
 
@@ -21,8 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('lessons', function (Blueprint $table) {
-            //
-        });
+        Schema::dropIfExists('enrollments');
     }
 };

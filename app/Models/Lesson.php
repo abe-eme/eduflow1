@@ -7,30 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class Lesson extends Model
 {
-    use HasFactory;
-
-    /*
-    |--------------------------------------------------------------------------
-    | MASS ASSIGNABLE FIELDS
-    |--------------------------------------------------------------------------
-    */
     protected $fillable = [
         'course_id',
         'title',
         'content',
-        'type',
-        'file_path',
-        'vidio_url',
-        'order'
+        'lesson_order'
     ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | RELATIONSHIP: LESSON BELONGS TO COURSE
-    |--------------------------------------------------------------------------
-    */
     public function course()
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function progress()
+    {
+        return $this->hasMany(LessonProgress::class);
     }
 }

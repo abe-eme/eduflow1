@@ -115,8 +115,22 @@ const user = page.props.auth?.user
             >
                 🎓 My Courses
             </Link>
-
+<Link
+    v-if="user?.role === 'admin'"
+    href="/admin/batches"
+    :class="[
+        'flex items-center gap-3 p-2 rounded transition',
+        page.url.includes('batches')
+            ? 'bg-blue-600'
+            : 'hover:bg-gray-700'
+    ]"
+>
+    📦 Batches
+        </Link>
         </nav>
+        <!-- BATCHES (NEW CORE FEATURE) -->
+
+
 
         <!-- LOGOUT -->
         <div class="p-4 border-t border-gray-700">

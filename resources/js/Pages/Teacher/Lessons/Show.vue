@@ -73,8 +73,8 @@ const currentLesson = ref(props.lesson)
                 {{ currentLesson.type }}
             </p>
 
-            <!-- TEXT -->
-            <div v-if="currentLesson.type === 'text'" class="text-gray-800 leading-7 whitespace-pre-line">
+            <!-- TEXT (ONLY FIX HERE) -->
+            <div v-if="!currentLesson.type || currentLesson.type === 'text'" class="text-gray-800 leading-7 whitespace-pre-line">
                 {{ currentLesson.content }}
             </div>
 

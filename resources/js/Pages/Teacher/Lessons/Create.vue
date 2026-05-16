@@ -1,134 +1,117 @@
 <script setup>
-import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { useForm, Link } from '@inertiajs/vue3'
+import { reactive, ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
-    course: Object
-})
+    courseId: Number
+});
 
-const form = useForm({
+const form = reactive({
     title: '',
-    type: 'text',
-    content: '',
-    order: 1
-})
+    type: 'text',          // Default type selector
+    content_body: '',      // Rich text description / AI output
+    media_file: null       // Video, Audio, or Image binary file upload
+});
 
-const submit = () => {
-    form.post(`/teacher/courses/${props.course.id}/lessons`, {
-        onSuccess: () => {
-            form.reset()
-        }
-    })
-}
+const aiPrompt = ref('');
+const isGeneratingAi = ref(false);
+
+// Call an API endpoint to generate content using AI
+const generateWithAi = async () => {
+    if (!aiPrompt.value) return;
+    isGeneratingAi.value = true;
+    
+    try {
+        const response = await fetch('/api/ai/generate-lesson', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: aiPrompt.value, type: form.type })
+        });
+        const data = await response.json();
+        form.content_body = data.generated_text;
+    } catch (error) {
+        alert('AI Generation failed. Please try again.');
+    } finally {
+        isGeneratingAi.value = false;
+    }
+};
+
+// Handle file input changes safely
+const handleFileUpload = (event) => {
+    form.media_file = event.target.files[0];
+};
+
+// Submit the multi-media form to your Laravel backend
+const submitLesson = () => {
+    // Force Inertia to send data as a Multipart Form to support file uploads
+    router.post(route('teacher.lessons.store', props.courseId), form, {
+        forceFormData: true
+    });
+};
 </script>
 
 <template>
-<AdminLayout>
+    <div class="min-h-screen bg-slate-950 text-slate-100 p-8">
+        <div class="max-w-3xl mx-auto">
+            <!-- Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold tracking-tight text-white">Create New Lesson</h1>
+                <p class="text-slate-400 text-sm mt-1">Mix AI text generation with high-fidelity raw video and audio uploads.</p>
+            </div>
 
-<div class="p-6 max-w-3xl mx-auto">
+            <!-- Main Creation Form Card -->
+            <form @submit.prevent="submitLesson" class="space-y-6 bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-xl">
+                <!-- Lesson Title -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lesson Title</label>
+                    <input v-model="form.title" type="text" placeholder="e.g., Understanding Middleware Pipelines" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-lg px-4 py-2.5 text-sm text-slate-200 outline-none transition-colors" required />
+                </div>
 
-    <!-- HEADER -->
-    <div class="mb-6 flex justify-between items-center">
+                <!-- Media Content Type Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Primary Material Format</label>
+                    <div class="grid grid-cols-4 gap-3">
+                        <button v-for="mediaType in ['text', 'video', 'audio', 'image']" :key="mediaType" type="button" @click="form.type = mediaType" :class="[
+                            'py-3 text-sm font-medium border rounded-lg uppercase tracking-wider transition-all',
+                            form.type === mediaType ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ]">
+                            {{ mediaType }}
+                        </button>
+                    </div>
+                </div>
 
-        <div>
-            <h1 class="text-2xl font-bold">
-                Add Lesson - {{ course.title }}
-            </h1>
-            <p class="text-sm text-gray-500">
-                Create lesson content for students
-            </p>
+                <!-- AI Generation Portal Container -->
+                <div class="p-4 bg-slate-950 border border-slate-800 rounded-lg">
+                    <label class="block text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">💡 NexusAI Assistant Tool</label>
+                    <div class="flex gap-2">
+                        <input v-model="aiPrompt" type="text" placeholder="Explain how user authentication logic flows step by step..." class="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-lg px-4 py-2 text-sm text-slate-200 outline-none transition-colors" />
+                        <button type="button" @click="generateWithAi" :disabled="isGeneratingAi" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-4 rounded-lg transition-colors disabled:opacity-50">
+                            {{ isGeneratingAi ? 'Thinking...' : 'Ask AI' }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rich Text Material Content Body -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lesson Body Content</label>
+                    <textarea v-model="form.content_body" rows="8" placeholder="Type lesson text or let the AI write it out for you..." class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-lg px-4 py-3 text-sm text-slate-200 font-sans outline-none transition-colors"></textarea>
+                </div>
+
+                <!-- File Media Stream Input (Hidden if regular text) -->
+                <div v-if="form.type !== 'text'">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        Upload Source {{ form.type }} File
+                    </label>
+                    <input type="file" @change="handleFileUpload" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer" />
+                </div>
+
+                <!-- Save Action Buttons -->
+                <div class="flex justify-end pt-4 border-t border-slate-800 gap-3">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors shadow-md">
+                        Publish Lesson
+                    </button>
+                </div>
+            </form>
         </div>
-
-        <Link
-            :href="`/teacher/courses/${course.id}/lessons`"
-            class="text-blue-600 hover:underline"
-        >
-            ← Back
-        </Link>
-
     </div>
-
-    <!-- FORM -->
-    <div class="bg-white p-6 rounded-xl shadow space-y-5">
-
-        <!-- TITLE -->
-        <div>
-            <label class="text-sm text-gray-600">Lesson Title</label>
-            <input
-                v-model="form.title"
-                type="text"
-                class="w-full mt-1 p-3 border rounded-lg"
-                placeholder="Enter lesson title"
-            />
-        </div>
-
-        <!-- TYPE -->
-        <div>
-            <label class="text-sm text-gray-600">Lesson Type</label>
-            <select
-                v-model="form.type"
-                class="w-full mt-1 p-3 border rounded-lg"
-            >
-                <option value="text">Text Lesson</option>
-                <option value="video">Video Lesson (YouTube)</option>
-                <option value="image">Image Lesson</option>
-            </select>
-        </div>
-
-        <!-- CONTENT -->
-        <div>
-            <label class="text-sm text-gray-600">Content</label>
-
-            <!-- TEXT -->
-            <textarea
-                v-if="form.type === 'text'"
-                v-model="form.content"
-                class="w-full mt-1 p-3 border rounded-lg"
-                rows="5"
-                placeholder="Write lesson content..."
-            ></textarea>
-
-            <!-- VIDEO -->
-            <input
-                v-if="form.type === 'video'"
-                v-model="form.content"
-                type="text"
-                class="w-full mt-1 p-3 border rounded-lg"
-                placeholder="Paste YouTube link (https://youtube.com/watch?v=...)"
-            />
-
-            <!-- IMAGE -->
-            <input
-                v-if="form.type === 'image'"
-                v-model="form.content"
-                type="text"
-                class="w-full mt-1 p-3 border rounded-lg"
-                placeholder="Paste image URL"
-            />
-        </div>
-
-        <!-- ORDER -->
-        <div>
-            <label class="text-sm text-gray-600">Lesson Order</label>
-            <input
-                v-model="form.order"
-                type="number"
-                class="w-full mt-1 p-3 border rounded-lg"
-            />
-        </div>
-
-        <!-- BUTTON -->
-        <button
-            @click="submit"
-            :disabled="form.processing"
-            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-        >
-            Create Lesson
-        </button>
-
-    </div>
-
-</div>
-
-</AdminLayout>
 </template>

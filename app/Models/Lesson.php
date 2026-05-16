@@ -11,7 +11,10 @@ class Lesson extends Model
         'course_id',
         'title',
         'content',
-        'lesson_order'
+        'type',
+        'lesson_order',
+        'is_published',
+        'duration'
     ];
 
     public function course()

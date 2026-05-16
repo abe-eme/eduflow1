@@ -14,6 +14,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\LessonController;
 use App\Http\Controllers\Admin\CourseBatchController;
 use App\Http\Controllers\Student\BatchEnrollmentController;
+use App\Http\Controllers\Student\LessonProgressController;
 
 
 
@@ -180,11 +181,6 @@ Route::middleware(['auth'])->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/admin/batches', [CourseBatchController::class, 'index']);
-    Route::post('/admin/batches', [CourseBatchController::class, 'store']);
-    Route::patch('/admin/batches/{id}/status', [CourseBatchController::class, 'updateStatus']);
-Route::get('/admin/batches/create', [CourseBatchController::class, 'create']);
-
 /*
 |--------------------------------------------------------------------------
 | DELETE USER
@@ -273,6 +269,9 @@ Route::delete('/teacher/courses/{course}',
         ->name('teacher.lessons.create');
 
     Route::post('/teacher/courses/{course}/lessons', [LessonController::class, 'store']);
+
+Route::patch('/lessons/{lesson}/toggle', [LessonController::class, 'togglePublish']);
+Route::delete('/lessons/{lesson}', [LessonController::class, 'destroy']);
 
     /*
     |--------------------------------------------------------------------------
@@ -471,6 +470,9 @@ Route::get('/teacher/courses/{course}/quizzes', function ($courseId) {
         // DELETE LESSON
         Route::delete('/courses/{course}/lessons/{lesson}', [LessonController::class, 'destroy'])
             ->name('teacher.lessons.destroy');
+            Route::post('/lessons/{lesson}/complete', 
+    [LessonProgressController::class, 'complete']
+)->middleware('auth');
     
 
     /*
@@ -553,9 +555,19 @@ Route::middleware(['auth'])->group(function () {
     |--------------------------------------------------------------------------
     */
 
+
+Route::get('/student/explore', [CourseController::class, 'explore'])
+    ->name('student.explore');
+    Route::get('/student/courses', [CourseController::class, 'studentCourse'])
+    ->name('student.courses.index');
+    Route::get('/student/courses/{course}', [CourseController::class, 'studentShow'])
+    ->name('student.courses.show');
+    Route::post('/lessons/{lesson}/complete', [CourseController::class, 'completeLesson']);
+   
     Route::delete('/courses/{course}/unenroll',
         [CourseController::class, 'unenroll']
     )->name('courses.unenroll');
+    
 
     /*
     |--------------------------------------------------------------------------
@@ -618,3 +630,13 @@ Route::middleware(['auth'])->group(function () {
 });
 });
 
+use App\Http\Controllers\Auth\InvitationController;
+use App\Http\Controllers\Auth\RegisteredUserController;
+
+// Route for Admin to generate and send invite
+Route::middleware(['auth', 'can:admin-only'])->group(function () {
+    Route::post('/admin/invite-teacher', [InvitationController::class, 'sendInvite'])->name('admin.invite.teacher');
+});
+
+// The entry route handling the submitted registration form 
+Route::post('/register', [RegisteredUserController::class, 'store']);

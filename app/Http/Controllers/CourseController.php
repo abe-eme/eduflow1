@@ -26,6 +26,7 @@ class CourseController extends Controller
 
         // 🔥 THIS FIXES YOUR ERROR
         'teacher_id' => auth()->id(),
+        'is_approved' => true,
 
         'status' => 'pending',
     ]);
@@ -104,7 +105,7 @@ class CourseController extends Controller
     public function adminIndex()
     {
         return Inertia::render('Admin/Courses/Index', [
-            'courses' => Course::with('user')->get()
+            'courses' => Course::with('teacher')->get()
         ]);
     }
 
@@ -114,7 +115,7 @@ class CourseController extends Controller
         'course' => $course,
 
         // ✅ FIX 1: load lessons
-        'lessons' => $course->lessons()->orderBy('order')->get(),
+        'lessons' => $course->lessons()->orderBy('lesson_order')->get(),
 
         // ✅ FIX 2: load assignments (THIS WAS MISSING)
         'assignments' => \App\Models\Assignment::where('course_id', $course->id)
@@ -130,24 +131,30 @@ class CourseController extends Controller
 }
 
     // ✅ FIXED ENROLL ONLY (SINGLE VERSION)
-    public function enroll(Course $course)
+ public function enroll(Course $course)
 {
-    Enrollment::firstOrCreate([
+    \App\Models\Enrollment::firstOrCreate([
         'user_id' => auth()->id(),
         'course_id' => $course->id
     ]);
 
-    return redirect()->back();
+    return back();
 }
 
-   public function studentCourses()
-{
-    $courses = Course::with('user')
-        ->where('status', 'approved')
-        ->latest()
-        ->get();
 
-    return Inertia::render('Student/Courses/Index', [
+public function studentCourse()
+{
+    $courses = Course::latest()->get();
+
+    $courses->map(function ($course) {
+        $course->is_enrolled = \App\Models\Enrollment::where('user_id', auth()->id())
+            ->where('course_id', $course->id)
+            ->exists();
+
+        return $course;
+    });
+
+    return Inertia::render('Student/Course/Index', [
         'courses' => $courses
     ]);
 }
@@ -157,13 +164,21 @@ public function studentShow(Course $course)
         ->where('course_id', $course->id)
         ->exists();
 
-    return Inertia::render('Student/Courses/Show', [
+    $lastLesson = null;
+
+    $enrollment = \App\Models\Enrollment::where('user_id', auth()->id())
+        ->where('course_id', $course->id)
+        ->first();
+
+    if ($enrollment && $enrollment->last_lesson_id) {
+        $lastLesson = \App\Models\Lesson::find($enrollment->last_lesson_id);
+    }
+
+    return Inertia::render('Student/Course/Show', [
         'course' => $course,
         'lessons' => $course->lessons,
-        'assignments' => \App\Models\Assignment::where('course_id', $course->id)
-            ->latest()
-            ->get(),
-        'isEnrolled' => $isEnrolled
+        'isEnrolled' => $isEnrolled,   // ✅ IMPORTANT FIX
+        'lastLesson' => $lastLesson
     ]);
 }
 public function myCourses()
@@ -190,55 +205,56 @@ public function unenroll(Course $course)
 
 public function studentLesson(Course $course, Lesson $lesson)
 {
-    // 🔒 check enrollment
-    $enrolled = Enrollment::where('user_id', auth()->id())
+    $userId = auth()->id();
+
+    // check enrollment
+    $enrolled = \App\Models\Enrollment::where('user_id', $userId)
         ->where('course_id', $course->id)
         ->exists();
 
     if (!$enrolled) {
-        abort(403, 'You are not enrolled');
+        abort(403, 'You must enroll first');
     }
 
-    // ensure lesson belongs to course
-    if ($lesson->course_id !== $course->id) {
-        abort(404);
-    }
-
-    $lessons = Lesson::where('course_id', $course->id)
-        ->orderBy('order')
+    // all lessons ordered
+    $lessons = $course->lessons()
+        ->orderBy('lesson_order')
         ->get();
+
+    // completed lessons
+    $completed = \App\Models\LessonProgress::where('user_id', $userId)
+        ->pluck('lesson_id')
+        ->toArray();
+
+    // first lesson
+    $firstLesson = $lessons->first();
+
+    // previous lesson
+    $previousLesson = $lessons
+        ->where('lesson_order', '<', $lesson->lesson_order)
+        ->sortByDesc('lesson_order')
+        ->first();
+
+    // CAN ACCESS RULE (FIXED LOGIC)
+    $canAccess =
+        $lesson->id === $firstLesson->id || // first lesson always open
+        in_array($lesson->id, $completed) || // already completed
+        ($previousLesson && in_array($previousLesson->id, $completed)); // previous done
+
+    // next lesson
+    $nextLesson = $lessons
+        ->where('lesson_order', '>', $lesson->lesson_order)
+        ->sortBy('lesson_order')
+        ->first();
 
     return Inertia::render('Student/Lessons/Show', [
         'course' => $course,
         'lesson' => $lesson,
-        'lessons' => $lessons
+        'lessons' => $lessons,
+        'nextLesson' => $nextLesson,
+        'isCompleted' => in_array($lesson->id, $completed),
+        'canAccess' => $canAccess,
     ]);
-}
-public function editAssignment($assignmentId)
-{
-    $assignment = Assignment::findOrFail($assignmentId);
-
-    return Inertia::render('Teacher/Assignments/Edit', [
-        'assignment' => $assignment
-    ]);
-}
-public function updateAssignment(Request $request, $assignmentId)
-{
-    $assignment = Assignment::findOrFail($assignmentId);
-
-    $request->validate([
-        'title' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'due_date' => 'nullable|date'
-    ]);
-
-    $assignment->update([
-        'title' => $request->title,
-        'description' => $request->description,
-        'due_date' => $request->due_date
-    ]);
-
-    return redirect()->route('teacher.assignments.index', $assignment->course_id);
 }
 public function deleteAssignment($assignmentId)
 {
@@ -263,5 +279,55 @@ public function assignmentSubmissions($assignmentId)
         'assignment' => $assignment,
         'submissions' => $submissions
     ]);
+}
+public function explore()
+{
+    $courses = Course::where('is_approved', true)
+        ->latest()
+        ->get();
+
+    return Inertia::render('Student/Explore', [
+        'courses' => $courses
+    ]);
+}
+public function completeLesson(Lesson $lesson)
+{
+    $userId = auth()->id();
+
+    // save progress
+    \App\Models\LessonProgress::firstOrCreate([
+        'user_id' => $userId,
+        'lesson_id' => $lesson->id,
+    ]);
+
+    // update continue learning
+    $enrollment = \App\Models\Enrollment::where('user_id', $userId)
+        ->where('course_id', $lesson->course_id)
+        ->first();
+
+    if ($enrollment) {
+        $enrollment->update([
+            'last_lesson_id' => $lesson->id
+        ]);
+    }
+
+    // get next lesson
+    $nextLesson = \App\Models\Lesson::where('course_id', $lesson->course_id)
+        ->where('lesson_order', '>', $lesson->lesson_order)
+        ->orderBy('lesson_order')
+        ->first();
+
+    // auto go next lesson
+    if ($nextLesson) {
+
+        return redirect(
+            "/student/courses/{$lesson->course_id}/lessons/{$nextLesson->id}"
+        );
+    }
+
+    // course finished
+    return redirect(
+        "/student/courses/{$lesson->course_id}"
+    )->with('success', 'Course completed!');
 }
 }

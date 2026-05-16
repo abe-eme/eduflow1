@@ -1,51 +1,110 @@
 <script setup>
+import { router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { ref } from 'vue'
 
 const props = defineProps({
-    lesson: Object
+    course: Object,
+    lesson: Object,
+    lessons: Array,   // IMPORTANT
+    nextLesson: Object,
+    isCompleted: Boolean,
+    canAccess: Boolean
 })
 
-const embed = (url) => {
-    if (!url) return ''
-    return url.replace('watch?v=', 'embed/')
+const currentLesson = ref(props.lesson)
+
+const completeLesson = () => {
+
+    if (props.isCompleted) return
+
+    router.post(`/lessons/${props.lesson.id}/complete`, {}, {
+        preserveScroll: true,
+        onSuccess: () => router.reload()
+    })
 }
 </script>
 
 <template>
-<AdminLayout>
 
-<div class="p-8 max-w-5xl mx-auto space-y-6">
+<div class="min-h-screen bg-gray-100 flex">
 
-    <!-- TITLE -->
-    <h1 class="text-3xl font-bold text-gray-800">
-        {{ lesson.title }}
-    </h1>
+    <!-- SIDEBAR LESSON LIST (FIXED MISSING PART) -->
+    <div class="w-72 bg-white border-r overflow-y-auto">
 
-    <!-- TEXT -->
-    <div v-if="lesson.type === 'text'" class="text-gray-700 leading-relaxed bg-white p-6 rounded-2xl shadow">
-        {{ lesson.content }}
+        <div class="p-4 border-b">
+            <h2 class="font-bold text-gray-800">
+                {{ course.title }}
+            </h2>
+            <p class="text-xs text-gray-500">Lessons</p>
+        </div>
+
+        <div>
+            <div
+                v-for="l in lessons"
+                :key="l.id"
+                @click="currentLesson = l"
+                class="p-3 border-b cursor-pointer hover:bg-gray-100"
+                :class="currentLesson.id === l.id ? 'bg-gray-200' : ''"
+            >
+                <div class="font-medium text-sm">
+                    {{ l.title }}
+                </div>
+
+                <div class="text-xs text-gray-500">
+                    {{ l.type ?? 'text' }}
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- VIDEO -->
-    <div v-else-if="lesson.type === 'video'" class="bg-black rounded-2xl overflow-hidden shadow-lg">
-        <iframe
-            class="w-full h-[500px]"
-            :src="embed(lesson.content)"
-            allowfullscreen
-        ></iframe>
-    </div>
+    <!-- MAIN CONTENT -->
+    <div class="flex-1 p-6">
 
-    <!-- IMAGE -->
-    <div v-else-if="lesson.type === 'image'" class="bg-white p-4 rounded-2xl shadow">
-        <img :src="lesson.content" class="w-full rounded-xl" />
-    </div>
+        <h1 class="text-2xl font-bold mb-2">
+            {{ currentLesson.title }}
+        </h1>
 
-    <!-- EMPTY -->
-    <div v-else class="text-center text-gray-500 bg-gray-50 p-10 rounded-2xl">
-        No content available
+        <p v-if="isCompleted" class="text-green-600 font-semibold mb-3">
+            ✔ Completed
+        </p>
+
+        <!-- TEXT -->
+        <div v-if="!currentLesson.type || currentLesson.type === 'text'">
+            {{ currentLesson.content }}
+        </div>
+
+        <!-- VIDEO -->
+        <div v-else-if="currentLesson.type === 'video'">
+            <iframe
+                class="w-full h-[400px]"
+                :src="currentLesson.content?.replace('watch?v=', 'embed/')"
+            />
+        </div>
+
+        <!-- IMAGE -->
+        <div v-else-if="currentLesson.type === 'image'">
+            <img :src="currentLesson.content" />
+        </div>
+
+        <!-- ACTION -->
+        <div class="mt-6">
+            <button
+                v-if="!isCompleted"
+                @click="completeLesson"
+                class="bg-green-600 text-white px-5 py-2 rounded"
+            >
+                Mark Complete
+            </button>
+
+            <button v-else disabled class="bg-gray-400 text-white px-5 py-2 rounded">
+                Completed
+            </button>
+        </div>
+
     </div>
 
 </div>
 
-</AdminLayout>
 </template>
